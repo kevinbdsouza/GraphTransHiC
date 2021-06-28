@@ -14,8 +14,6 @@ from layers.mlp_readout_layer import MLPReadout
 class GraphTransformerNet(nn.Module):
     def __init__(self, net_params):
         super().__init__()
-        num_atom_type = net_params['num_atom_type']
-        num_bond_type = net_params['num_bond_type']
         hidden_dim = net_params['hidden_dim']
         num_heads = net_params['n_heads']
         out_dim = net_params['out_dim']
@@ -38,10 +36,10 @@ class GraphTransformerNet(nn.Module):
         if self.wl_pos_enc:
             self.embedding_wl_pos_enc = nn.Embedding(max_wl_role_index, hidden_dim)
         
-        self.embedding_h = nn.Embedding(num_atom_type, hidden_dim)
+        self.embedding_h = nn.Embedding(8, hidden_dim)
 
         if self.edge_feat:
-            self.embedding_e = nn.Embedding(num_bond_type, hidden_dim)
+            self.embedding_e = nn.Embedding(8, hidden_dim)
         else:
             self.embedding_e = nn.Linear(1, hidden_dim)
         
