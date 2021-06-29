@@ -6,7 +6,7 @@ class Config:
     def __init__(self):
 
         self.device = None
-        self.dataset = "HiC_Rao_10kb"
+        self.dataset = "HiC"
         self.model = "GraphTransformer"
         self.num_chr = 23
         self.genome_len = 288091

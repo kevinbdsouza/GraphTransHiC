@@ -96,10 +96,10 @@ class HiCDatasetDGL(torch.utils.data.Dataset):
         self.num_atom_type = 28  # known meta-info about the zinc dataset; can be calculated as well
         self.num_bond_type = 4  # known meta-info about the zinc dataset; can be calculated as well
 
-        data_dir = './data/HiC_Rao_10kb'
+        data_dir = './data/HiC'
 
         if self.name == 'ZINC-full':
-            data_dir = './data/HiC_Rao_10kb/zinc_full'
+            data_dir = './data/HiC/zinc_full'
             self.train = HiCDGL(data_dir, 'train', num_graphs=220011)
             self.val = HiCDGL(data_dir, 'val', num_graphs=24445)
             self.test = HiCDGL(data_dir, 'test', num_graphs=5000)
@@ -247,7 +247,7 @@ class HiCDataset(torch.utils.data.Dataset):
         self.hic_path = '/data2/hic_lstm/data/'
         self.sizes_file = 'chr_cum_sizes2.npy'
         self.start_end_file = 'starts.npy'
-        data_dir = 'data/HiC_Rao_10kb/'
+        data_dir = 'data/HiC/'
         with open(data_dir + name + '.pkl', "rb") as f:
             f = pickle.load(f)
             self.train = f[0]

@@ -11,5 +11,5 @@ def LoadData(dataset_name):
         ; dataset object
     """
     # handling for HiC dataset
-    if dataset_name == 'HiC_Rao_10kb':
+    if dataset_name == 'HiC':
         return HiCDataset(dataset_name)
