@@ -13,7 +13,7 @@ import networkx as nx
 import hashlib
 
 
-class HiCDGL(torch.utils.data.Dataset):
+class MoleculeDGL(torch.utils.data.Dataset):
     def __init__(self, data_dir, split, num_graphs=None):
         self.data_dir = data_dir
         self.split = split
