@@ -264,6 +264,7 @@ class HiCDataset(torch.utils.data.Dataset):
     def collate(self, samples):
         # The input samples is a list of pairs (graph, label).
         graphs, labels = map(list, zip(*samples))
+        labels = torch.tensor(labels, dtype=torch.float64)
         labels = torch.tensor(np.array(labels)).unsqueeze(1)
         batched_graph = dgl.batch(graphs)
 
