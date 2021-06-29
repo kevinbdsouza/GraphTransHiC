@@ -45,7 +45,7 @@ class Config:
         self.params = {
             "seed": 41,
             "epochs": 100,
-            "batch_size": 128,
+            "batch_size": 64,
             "init_lr": 0.0007,
             "lr_reduce_factor": 0.5,
             "lr_schedule_patience": 15,

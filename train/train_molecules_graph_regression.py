@@ -24,7 +24,7 @@ def train_epoch(model, optimizer, device, data_loader):
         try:
             batch_lap_pos_enc = batch_graphs.ndata['lap_pos_enc'].to(device)
             sign_flip = torch.rand(batch_lap_pos_enc.size(1)).to(device)
-            sign_flip[sign_flip >= 0.5] = 1.0;
+            sign_flip[sign_flip >= 0.5] = 1.0
             sign_flip[sign_flip < 0.5] = -1.0
             batch_lap_pos_enc = batch_lap_pos_enc * sign_flip.unsqueeze(0)
         except:
