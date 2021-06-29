@@ -8,7 +8,8 @@ import math
 
 from train.metrics import MAE
 
-def train_epoch(model, optimizer, device, data_loader, epoch):
+
+def train_epoch(model, optimizer, device, data_loader):
     model.train()
     epoch_loss = 0
     epoch_train_mae = 0
@@ -23,11 +24,12 @@ def train_epoch(model, optimizer, device, data_loader, epoch):
         try:
             batch_lap_pos_enc = batch_graphs.ndata['lap_pos_enc'].to(device)
             sign_flip = torch.rand(batch_lap_pos_enc.size(1)).to(device)
-            sign_flip[sign_flip>=0.5] = 1.0; sign_flip[sign_flip<0.5] = -1.0
+            sign_flip[sign_flip >= 0.5] = 1.0;
+            sign_flip[sign_flip < 0.5] = -1.0
             batch_lap_pos_enc = batch_lap_pos_enc * sign_flip.unsqueeze(0)
         except:
             batch_lap_pos_enc = None
-            
+
         try:
             batch_wl_pos_enc = batch_graphs.ndata['wl_pos_enc'].to(device)
         except:
@@ -42,10 +44,11 @@ def train_epoch(model, optimizer, device, data_loader, epoch):
         nb_data += batch_targets.size(0)
     epoch_loss /= (iter + 1)
     epoch_train_mae /= (iter + 1)
-    
+
     return epoch_loss, epoch_train_mae, optimizer
 
-def evaluate_network(model, device, data_loader, epoch):
+
+def evaluate_network(model, device, data_loader):
     model.eval()
     epoch_test_loss = 0
     epoch_test_mae = 0
@@ -60,12 +63,12 @@ def evaluate_network(model, device, data_loader, epoch):
                 batch_lap_pos_enc = batch_graphs.ndata['lap_pos_enc'].to(device)
             except:
                 batch_lap_pos_enc = None
-            
+
             try:
                 batch_wl_pos_enc = batch_graphs.ndata['wl_pos_enc'].to(device)
             except:
                 batch_wl_pos_enc = None
-                
+
             batch_scores = model.forward(batch_graphs, batch_x, batch_e, batch_lap_pos_enc, batch_wl_pos_enc)
             loss = model.loss(batch_scores, batch_targets)
             epoch_test_loss += loss.detach().item()
@@ -73,6 +76,5 @@ def evaluate_network(model, device, data_loader, epoch):
             nb_data += batch_targets.size(0)
         epoch_test_loss /= (iter + 1)
         epoch_test_mae /= (iter + 1)
-        
-    return epoch_test_loss, epoch_test_mae
 
+    return epoch_test_loss, epoch_test_mae

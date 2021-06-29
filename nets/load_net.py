@@ -2,7 +2,7 @@
     Utility file to select GraphNN model as
     selected by the user
 """
-from nets.molecules_graph_regression.graph_transformer_net import GraphTransformerNet
+from nets.graph_transformer_net import GraphTransformerNet
 
 
 def GraphTransformer(net_params):

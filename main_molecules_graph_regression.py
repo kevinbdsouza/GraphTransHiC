@@ -1,21 +1,15 @@
-import dgl
 import numpy as np
 import os
-import socket
 import time
 import random
 import glob
-import argparse, json
-import pickle
 import torch
 import pathlib
-import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
-from nets.molecules_graph_regression.load_net import gnn_model
+from nets.load_net import gnn_model
 from data.data import LoadData
 from train.config import Config
 
@@ -45,17 +39,16 @@ def view_model_param(MODEL_NAME, net_params):
     print("MODEL DETAILS:\n")
     # print(model)
     for param in model.parameters():
-        # print(param.data.size())
         total_param += np.prod(list(param.data.size()))
     print('MODEL/Total parameters:', MODEL_NAME, total_param)
     return total_param
 
 
-def train_val_pipeline(MODEL_NAME, dataset, params, net_params, dirs):
+def train_val_pipeline(model_name, dataset, params, net_params, dirs):
     t0 = time.time()
     per_epoch_time = []
 
-    DATASET_NAME = dataset.name
+    dataset_name = dataset.name
 
     if net_params['lap_pos_enc']:
         st = time.time()
@@ -83,7 +76,7 @@ def train_val_pipeline(MODEL_NAME, dataset, params, net_params, dirs):
     # Write the network and optimization hyper-parameters in folder config/
     with open(write_config_file + '.txt', 'w') as f:
         f.write("""Dataset: {},\nModel: {}\n\nparams={}\n\nnet_params={}\n\n\nTotal Parameters: {}\n\n""".format(
-            DATASET_NAME, MODEL_NAME, params, net_params, net_params['total_param']))
+            dataset_name, model_name, params, net_params, net_params['total_param']))
 
     log_dir = os.path.join(root_log_dir, "RUN_" + str(0))
     writer = SummaryWriter(log_dir=log_dir)
@@ -99,7 +92,7 @@ def train_val_pipeline(MODEL_NAME, dataset, params, net_params, dirs):
     print("Validation Graphs: ", len(valset))
     print("Test Graphs: ", len(testset))
 
-    model = gnn_model(MODEL_NAME, net_params)
+    model = gnn_model(model_name, net_params)
     model = model.to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=params['init_lr'], weight_decay=params['weight_decay'])
@@ -127,11 +120,10 @@ def train_val_pipeline(MODEL_NAME, dataset, params, net_params, dirs):
 
                 start = time.time()
 
-                epoch_train_loss, epoch_train_mae, optimizer = train_epoch(model, optimizer, device, train_loader,
-                                                                           epoch)
+                epoch_train_loss, epoch_train_mae, optimizer = train_epoch(model, optimizer, device, train_loader)
 
-                epoch_val_loss, epoch_val_mae = evaluate_network(model, device, val_loader, epoch)
-                _, epoch_test_mae = evaluate_network(model, device, test_loader, epoch)
+                epoch_val_loss, epoch_val_mae = evaluate_network(model, device, val_loader)
+                _, epoch_test_mae = evaluate_network(model, device, test_loader)
 
                 epoch_train_losses.append(epoch_train_loss)
                 epoch_val_losses.append(epoch_val_loss)
@@ -173,15 +165,14 @@ def train_val_pipeline(MODEL_NAME, dataset, params, net_params, dirs):
 
                 # Stop training after params['max_time'] hours
                 if time.time() - t0 > params['max_time'] * 3600:
-                    print('-' * 89)
                     print("Max_time for training elapsed {:.2f} hours, so stopping".format(params['max_time']))
                     break
 
     except KeyboardInterrupt:
         print('Exiting from training early because of KeyboardInterrupt')
 
-    _, test_mae = evaluate_network(model, device, test_loader, epoch)
-    _, train_mae = evaluate_network(model, device, train_loader, epoch)
+    _, test_mae = evaluate_network(model, device, test_loader)
+    _, train_mae = evaluate_network(model, device, train_loader)
     print("Test MAE: {:.4f}".format(test_mae))
     print("Train MAE: {:.4f}".format(train_mae))
     print("Convergence Time (Epochs): {:.4f}".format(epoch))
@@ -197,7 +188,7 @@ def train_val_pipeline(MODEL_NAME, dataset, params, net_params, dirs):
         f.write("""Dataset: {},\nModel: {}\n\nparams={}\n\nnet_params={}\n\n{}\n\nTotal Parameters: {}\n\n
     FINAL RESULTS\nTEST MAE: {:.4f}\nTRAIN MAE: {:.4f}\n\n
     Convergence Time (Epochs): {:.4f}\nTotal Time Taken: {:.4f} hrs\nAverage Time Per Epoch: {:.4f} s\n\n\n""" \
-                .format(DATASET_NAME, MODEL_NAME, params, net_params, model, net_params['total_param'],
+                .format(dataset_name, model_name, params, net_params, model, net_params['total_param'],
                         test_mae, train_mae, epoch, (time.time() - t0) / 3600, np.mean(per_epoch_time)))
 
 
@@ -220,7 +211,7 @@ def main():
     root_ckpt_dir = cfg.output_directory + 'checkpoints/' + model_name + time.strftime('%Hh%Mm%Ss_on_%b_%d_%Y')
     write_file_name = cfg.output_directory + 'results/result_' + model_name + time.strftime('%Hh%Mm%Ss_on_%b_%d_%Y')
     write_config_file = cfg.output_directory + 'configs/config_' + model_name + time.strftime('%Hh%Mm%Ss_on_%b_%d_%Y')
-    dirs = [root_log_dir, root_ckpt_dir, write_file_name, write_config_file]
+    dirs = root_log_dir, root_ckpt_dir, write_file_name, write_config_file
 
     for dir in dirs:
         directory = os.path.dirname(cfg.output_directory + dir)
