@@ -1,7 +1,7 @@
 """
     File to load dataset based on user control from main file
 """
-from data.HiC import HiCDataset
+from data.molecules import HiCDataset
 
 
 def LoadData(dataset_name):
