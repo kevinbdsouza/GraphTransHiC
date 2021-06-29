@@ -4,6 +4,7 @@ import torch.utils.data
 import time
 import os
 import numpy as np
+import pandas as pd
 import csv
 import dgl
 from scipy import sparse as sp
