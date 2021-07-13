@@ -27,7 +27,7 @@ class Config:
             "L": 1,
             "n_heads": 8,
             "hidden_dim": 16,
-            "out_dim": 8,
+            "out_dim": 16,
             "edge_feat": True,
             "residual": True,
             "readout": "mean",
