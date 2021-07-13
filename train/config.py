@@ -24,7 +24,7 @@ class Config:
         ##########################################
 
         self.net_params = {
-            "L": 10,
+            "L": 2,
             "n_heads": 8,
             "hidden_dim": 16,
             "out_dim": 8,
