@@ -38,7 +38,7 @@ class Config:
             "self_loop": False,
             "lap_pos_enc": False,
             "wl_pos_enc": False,
-            "full_graph": True,
+            "full_graph": False,
             "device": None
         }
 
