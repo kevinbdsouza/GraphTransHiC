@@ -15,7 +15,7 @@ class Config:
         self.lstm_nontrain = False
 
         self.gpu = {
-            "use": True,
+            "use": False,
             "id": 0
         }
 
