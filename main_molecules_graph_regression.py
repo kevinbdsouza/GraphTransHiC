@@ -12,6 +12,7 @@ from tqdm import tqdm
 from nets.load_net import gnn_model
 from data.data import LoadData
 from train.config import Config
+from train.train_molecules_graph_regression import train_epoch, evaluate_network
 
 
 class DotDict(dict):
