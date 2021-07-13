@@ -20,6 +20,7 @@ class GraphTransformerNet(nn.Module):
         in_feat_dropout = net_params['in_feat_dropout']
         dropout = net_params['dropout']
         n_layers = net_params['L']
+        batch_size = net_params['batch_size']
         self.readout = net_params['readout']
         self.layer_norm = net_params['layer_norm']
         self.batch_norm = net_params['batch_norm']
@@ -36,12 +37,12 @@ class GraphTransformerNet(nn.Module):
         if self.wl_pos_enc:
             self.embedding_wl_pos_enc = nn.Embedding(max_wl_role_index, hidden_dim)
         
-        self.embedding_h = nn.Embedding(8, hidden_dim)
+        self.embedding_h = nn.Embedding(batch_size, hidden_dim)
 
         if self.edge_feat:
-            self.embedding_e = nn.Embedding(8, hidden_dim)
+            self.embedding_e = nn.Embedding(batch_size, hidden_dim)
         else:
-            self.embedding_e = nn.Linear(1, hidden_dim)
+            self.embedding_e = nn.Linear(batch_size, hidden_dim)
         
         self.in_feat_dropout = nn.Dropout(in_feat_dropout)
         
