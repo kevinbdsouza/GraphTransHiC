@@ -101,13 +101,13 @@ class HiCDatasetDGL(torch.utils.data.Dataset):
 
         if self.name == 'ZINC-full':
             data_dir = './data/HiC/zinc_full'
-            self.train = HiCDGL(data_dir, 'train', num_graphs=220011)
-            self.val = HiCDGL(data_dir, 'val', num_graphs=24445)
-            self.test = HiCDGL(data_dir, 'test', num_graphs=5000)
+            self.train = MoleculeDGL(data_dir, 'train', num_graphs=220011)
+            self.val = MoleculeDGL(data_dir, 'val', num_graphs=24445)
+            self.test = MoleculeDGL(data_dir, 'test', num_graphs=5000)
         else:
-            self.train = HiCDGL(data_dir, 'train', num_graphs=10000)
-            self.val = HiCDGL(data_dir, 'val', num_graphs=1000)
-            self.test = HiCDGL(data_dir, 'test', num_graphs=1000)
+            self.train = MoleculeDGL(data_dir, 'train', num_graphs=10000)
+            self.val = MoleculeDGL(data_dir, 'val', num_graphs=1000)
+            self.test = MoleculeDGL(data_dir, 'test', num_graphs=1000)
         print("Time taken: {:.4f}s".format(time.time() - t0))
 
 
