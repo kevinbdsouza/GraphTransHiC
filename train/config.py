@@ -36,7 +36,7 @@ class Config:
             "layer_norm": False,
             "batch_norm": True,
             "self_loop": False,
-            "lap_pos_enc": False,
+            "lap_pos_enc": True,
             "wl_pos_enc": False,
             "full_graph": False,
             "device": None
