@@ -4,7 +4,7 @@
 from data.molecules import HiCDataset
 
 
-def LoadData(dataset_name):
+def LoadData(dataset_name, cfg, chr):
     """
         This function is called in the main_xx.py file 
         returns:
@@ -12,4 +12,4 @@ def LoadData(dataset_name):
     """
     # handling for HiC dataset
     if dataset_name == 'HiC_Rao_10kb':
-        return HiCDataset(dataset_name)
+        return HiCDataset(dataset_name, cfg, chr)

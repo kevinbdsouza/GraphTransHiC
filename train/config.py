@@ -8,6 +8,7 @@ class Config:
         self.device = None
         self.dataset = "HiC_Rao_10kb"
         self.model = "GraphTransformer"
+        self.cell = "GM"
         self.num_chr = 23
         self.genome_len = 288091
         self.resolution = 10000
@@ -37,7 +38,7 @@ class Config:
             "batch_norm": True,
             "self_loop": False,
             "lap_pos_enc": True,
-            "wl_pos_enc": True,                                     
+            "wl_pos_enc": True,
             "pos_enc_dim": 8,
             "full_graph": False,
             "device": None

@@ -195,9 +195,10 @@ def main():
     device = gpu_setup(cfg.gpu["use"], cfg.gpu["id"])
 
     # model, dataset, out_dir
+    chr = 21
     model_name = cfg.model
     dataset_name = cfg.dataset
-    dataset = LoadData(dataset_name)
+    dataset = LoadData(dataset_name, cfg, chr)
 
     params = cfg.params
     net_params = cfg.net_params

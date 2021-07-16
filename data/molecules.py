@@ -8,6 +8,7 @@ import pandas as pd
 import csv
 import dgl
 from scipy import sparse as sp
+from torch.nn.utils.rnn import pad_sequence
 import numpy as np
 import networkx as nx
 import hashlib
@@ -238,17 +239,20 @@ def wl_positional_encoding(g):
 
 class HiCDataset(torch.utils.data.Dataset):
 
-    def __init__(self, name):
+    def __init__(self, name, cfg, chr):
         """
             Loading HiC dataset
         """
         start = time.time()
-        print("Loading dataset %s..." % (name))
+        print("Loading Chromosome %s from dataset %s..." % (str(chr), name))
+        self.chr = chr
         self.name = name
-        self.hic_path = '/data2/hic_lstm/data/'
-        self.sizes_file = 'chr_cum_sizes2.npy'
-        self.start_end_file = 'starts.npy'
+        self.cell = cfg.cell
+        self.cfg = cfg
+        # self.dataset = self.get_data()
+
         data_dir = 'data/HiC/'
+
         with open(data_dir + name + '.pkl', "rb") as f:
             f = pickle.load(f)
             self.train = f[0]
@@ -257,8 +261,78 @@ class HiCDataset(torch.utils.data.Dataset):
             self.num_atom_type = f[3]
             self.num_bond_type = f[4]
         print('train, test, val sizes :', len(self.train), len(self.test), len(self.val))
+
         print("[I] Finished loading.")
         print("[I] Data load time: {:.4f}s".format(time.time() - start))
+
+    def load_hic(self):
+        data = pd.read_csv("%s%s/%s/hic_chr%s.txt" % (self.cfg.hic_path, self.cell, self.chr, self.chr), sep="\t",
+                           names=['i', 'j', 'v'])
+
+        data[['i', 'j']] = data[['i', 'j']] / self.cfg.resolution
+        data[['i', 'j']] = data[['i', 'j']].astype('int64')
+        return data
+
+    def contactProbabilities(self, values, delta=1e-10):
+        coeff = np.nan_to_num(1 / (values + delta))
+        CP = np.power(1 / np.exp(8), coeff)
+
+        return CP
+
+    def get_bin_idx(self, chr, pos):
+        sizes = np.load(self.cfg.hic_path + self.cfg.sizes_file, allow_pickle=True).item()
+        chr = ['chr' + str(x - 1) for x in chr]
+        chr_start = [sizes[key] for key in chr]
+
+        return pos + chr_start
+
+    def get_samples_sparse(self, data):
+        data = data.apply(pd.to_numeric)
+        nrows = max(data['i'].max(), data['j'].max()) + 1
+        data['v'] = data['v'].fillna(0)
+        data['i_binidx'] = self.get_bin_idx(np.full(data.shape[0], self.chr), data['i'])
+        data['j_binidx'] = self.get_bin_idx(np.full(data.shape[0], self.chr), data['j'])
+
+        values = []
+        input_idx = []
+        nvals_list = []
+        for row in range(nrows):
+            # get Hi-C values
+            vals = data[data['i'] == row]['v'].values
+            nvals = vals.shape[0]
+            if nvals == 0:
+                continue
+            else:
+                vals = self.contactProbabilities(vals)
+
+            if (nvals > 10):
+                nvals_list.append(nvals)
+                vals = torch.from_numpy(vals)
+
+                split_vals = vals.split(self.cfg.sequence_length, dim=0)
+                values = values + list(split_vals)
+
+                # get indices
+                j = torch.Tensor(data[data['i'] == row]['j_binidx'].values)
+                i = torch.Tensor(data[data['i'] == row]['i_binidx'].values)
+
+                # concatenate indices
+                ind = torch.cat((i.unsqueeze(-1), j.unsqueeze(-1)), 1)
+                split_ind = torch.split(ind, self.cfg.sequence_length, dim=0)
+                input_idx = input_idx + list(split_ind)
+
+        values = pad_sequence(values, batch_first=True)
+        input_idx = pad_sequence(input_idx, batch_first=True)
+
+        return input_idx, values
+
+    def get_data(self):
+        data = self.load_hic()
+        input_idx, values = self.get_samples_sparse(data)
+
+        # create dataset
+        dataset = torch.utils.data.TensorDataset(input_idx.float(), values.float())
+        return dataset
 
     # form a mini batch from a given list of samples = [(graph, label) pairs]
     def collate(self, samples):
