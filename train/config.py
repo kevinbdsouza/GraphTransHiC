@@ -37,7 +37,7 @@ class Config:
             "batch_norm": True,
             "self_loop": False,
             "lap_pos_enc": True,
-            "wl_pos_enc": False,
+            "wl_pos_enc": True,                                     
             "pos_enc_dim": 8,
             "full_graph": False,
             "device": None
