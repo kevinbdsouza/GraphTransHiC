@@ -91,24 +91,17 @@ class MoleculeDGL(torch.utils.data.Dataset):
 
 
 class HiCDatasetDGL(torch.utils.data.Dataset):
-    def __init__(self, name='Zinc'):
+    def __init__(self, cfg):
         t0 = time.time()
-        self.name = name
 
+        self.cfg = cfg
         self.num_atom_type = 28  # known meta-info about the zinc dataset; can be calculated as well
         self.num_bond_type = 4  # known meta-info about the zinc dataset; can be calculated as well
 
-        data_dir = './data/HiC'
-
-        if self.name == 'ZINC-full':
-            data_dir = './data/HiC/zinc_full'
-            self.train = MoleculeDGL(data_dir, 'train', num_graphs=220011)
-            self.val = MoleculeDGL(data_dir, 'val', num_graphs=24445)
-            self.test = MoleculeDGL(data_dir, 'test', num_graphs=5000)
-        else:
-            self.train = MoleculeDGL(data_dir, 'train', num_graphs=10000)
-            self.val = MoleculeDGL(data_dir, 'val', num_graphs=1000)
-            self.test = MoleculeDGL(data_dir, 'test', num_graphs=1000)
+        if self.cfg.dataset == 'HiC_Rao_10kb':
+            self.train = MoleculeDGL(self.cfg.hic_path, 'train', num_graphs=220011)
+            #self.val = MoleculeDGL(data_dir, 'val', num_graphs=24445)
+            #self.test = MoleculeDGL(data_dir, 'test', num_graphs=5000)
         print("Time taken: {:.4f}s".format(time.time() - t0))
 
 
