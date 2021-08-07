@@ -11,6 +11,8 @@ class Config:
         self.cell = "GM"
         self.num_chr = 23
         self.genome_len = 288091
+        self.cp_resolution = 100
+        self.num_nodes = 100
         self.resolution = 10000
         self.max_norm = 10
         self.lstm_nontrain = False

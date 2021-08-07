@@ -3,7 +3,6 @@ import pickle
 import torch.utils.data
 import time
 import os
-import numpy as np
 import pandas as pd
 import csv
 import dgl
@@ -12,24 +11,20 @@ from torch.nn.utils.rnn import pad_sequence
 import numpy as np
 import networkx as nx
 import hashlib
+from train.config import Config
 
 
 class MoleculeDGL(torch.utils.data.Dataset):
-    def __init__(self, data_dir, split, num_graphs=None):
-        self.data_dir = data_dir
+    def __init__(self, cfg, chr, split):
+        self.cfg = cfg
+        self.data_dir = cfg.data_dir
         self.split = split
-        self.num_graphs = num_graphs
+        self.cell = cfg.cell
+        self.chr = chr
+        self.contact_data = None
 
-        with open(data_dir + "/%s.pickle" % self.split, "rb") as f:
-            self.data = pickle.load(f)
-
-        if self.num_graphs in [10000, 1000]:
-            # loading the sampled indices from file ./zinc_molecules/<split>.index
-            with open(data_dir + "/%s.index" % self.split, "r") as f:
-                data_idx = [list(map(int, idx)) for idx in csv.reader(f)]
-                self.data = [self.data[i] for i in data_idx[0]]
-
-            assert len(self.data) == num_graphs, "Sample num_graphs again; available idx: train/val/test => 10k/1k/1k"
+        self.load_hic()
+        self.create_hic_graphs()
 
         """
         data is a list of Molecule dict objects with following attributes
@@ -43,11 +38,89 @@ class MoleculeDGL(torch.utils.data.Dataset):
 
         self.graph_lists = []
         self.graph_labels = []
-        self.n_samples = len(self.data)
         self._prepare()
 
+    def load_hic(self):
+        data = pd.read_csv("%s%s/%s/hic_chr%s.txt" % (self.cfg.hic_path, self.cell, self.chr, self.chr), sep="\t",
+                           names=['i', 'j', 'v'])
+
+        data[['i', 'j']] = data[['i', 'j']] / self.cfg.resolution
+        data[['i', 'j']] = data[['i', 'j']].astype('int64')
+
+        chr_max = int(data["i"].max())
+
+        self.contact_data = np.zeros((chr_max, chr_max))
+        rows = np.array(data["i"]).astype(int)
+        cols = np.array(data["j"]).astype(int)
+        data = self.contact_prob(np.array(data["v"]))
+
+        self.contact_data[rows, cols] = data
+        self.contact_data[cols, rows] = data
+
+    def create_hic_graphs(self):
+        print("preparing graphs for the %s set..." % (self.split.upper()))
+        window = self.cfg.num_nodes
+        num_windows = int(np.ceil(self.contact_data.shape[0] / window))
+        num_nodes_last_frame = int(self.contact_data.shape[0] % window)
+
+        for i in range(num_windows):
+            for j in range(num_windows):
+                if i == num_windows - 1 and j == num_windows - 1:
+                    window_data = self.contact_data[i * window:i * window + num_nodes_last_frame,
+                                  j * window:j * window + num_nodes_last_frame]
+
+                elif j == num_windows - 1:
+                    window_data = self.contact_data[i * window:(i + 1) * window,
+                                  j * window:j * window + num_nodes_last_frame]
+                elif i == num_windows - 1:
+                    window_data = self.contact_data[i * window:i * window + num_nodes_last_frame,
+                                  j * window:j * window + num_nodes_last_frame]
+                else:
+                    window_data = self.contact_data[i * window:(i + 1) * window,
+                                  j * window:(j + 1) * window]
+
+                if window_data.all() == 0:
+                    continue
+
+                window_data = np.round(window_data, 2) * 100
+                window_data = window_data.astype(int)
+                window_data = ~np.all(window_data == 0, axis=1)
+                window_data = ~np.all(window_data == 0, axis=0)
+                num_nodes = window_data.shape[0]
+
+                edge_list = (window_data != 0).nonzero()
+                edge_idxs_in_adj = edge_list.split(1, dim=1)
+                edge_features = window_data[edge_idxs_in_adj].reshape(-1).long()
+                node_features = None
+
+                # Create the DGL Graph
+                g = dgl.DGLGraph()
+                g.add_nodes(num_nodes)
+                g.ndata['feat'] = node_features
+
+                for src, dst in edge_list:
+                    g.add_edges(src.item(), dst.item())
+                g.edata['feat'] = edge_features
+
+                self.graph_lists.append(g)
+                self.graph_labels.append(torch.tensor(np.mean(window_data)))
+
+        pass
+
+    def contact_prob(self, values, delta=1e-10):
+        coeff = np.nan_to_num(1 / (values + delta))
+        CP = np.power(1 / np.exp(8), coeff)
+
+        return CP
+
+    def get_bin_idx(self, chr, pos):
+        sizes = np.load(self.cfg.hic_path + self.cfg.sizes_file, allow_pickle=True).item()
+        chr = ['chr' + str(x - 1) for x in chr]
+        chr_start = [sizes[key] for key in chr]
+
+        return pos + chr_start
+
     def _prepare(self):
-        print("preparing %d graphs for the %s set..." % (self.num_graphs, self.split.upper()))
 
         for molecule in self.data:
             node_features = molecule['atom_type'].long()
@@ -70,10 +143,6 @@ class MoleculeDGL(torch.utils.data.Dataset):
             self.graph_lists.append(g)
             self.graph_labels.append(molecule['logP_SA_cycle_normalized'])
 
-    def __len__(self):
-        """Return the number of graphs in the dataset."""
-        return self.n_samples
-
     def __getitem__(self, idx):
         """
             Get the idx^th sample.
@@ -91,17 +160,18 @@ class MoleculeDGL(torch.utils.data.Dataset):
 
 
 class HiCDatasetDGL(torch.utils.data.Dataset):
-    def __init__(self, cfg):
+    def __init__(self, cfg, chr):
         t0 = time.time()
 
         self.cfg = cfg
-        self.num_atom_type = 28  # known meta-info about the zinc dataset; can be calculated as well
-        self.num_bond_type = 4  # known meta-info about the zinc dataset; can be calculated as well
+        self.chr = chr
+        self.num_atom_type = self.cfg.genome_len
+        self.num_bond_type = self.cfg.cp_resolution
 
         if self.cfg.dataset == 'HiC_Rao_10kb':
-            self.train = MoleculeDGL(self.cfg.hic_path, 'train', num_graphs=220011)
-            #self.val = MoleculeDGL(data_dir, 'val', num_graphs=24445)
-            #self.test = MoleculeDGL(data_dir, 'test', num_graphs=5000)
+            self.train = MoleculeDGL(self.cfg, self.chr, 'train')
+            # self.val = MoleculeDGL(data_dir, 'val', num_graphs=24445)
+            # self.test = MoleculeDGL(data_dir, 'test', num_graphs=5000)
         print("Time taken: {:.4f}s".format(time.time() - t0))
 
 
@@ -258,75 +328,6 @@ class HiCDataset(torch.utils.data.Dataset):
         print("[I] Finished loading.")
         print("[I] Data load time: {:.4f}s".format(time.time() - start))
 
-    def load_hic(self):
-        data = pd.read_csv("%s%s/%s/hic_chr%s.txt" % (self.cfg.hic_path, self.cell, self.chr, self.chr), sep="\t",
-                           names=['i', 'j', 'v'])
-
-        data[['i', 'j']] = data[['i', 'j']] / self.cfg.resolution
-        data[['i', 'j']] = data[['i', 'j']].astype('int64')
-        return data
-
-    def contactProbabilities(self, values, delta=1e-10):
-        coeff = np.nan_to_num(1 / (values + delta))
-        CP = np.power(1 / np.exp(8), coeff)
-
-        return CP
-
-    def get_bin_idx(self, chr, pos):
-        sizes = np.load(self.cfg.hic_path + self.cfg.sizes_file, allow_pickle=True).item()
-        chr = ['chr' + str(x - 1) for x in chr]
-        chr_start = [sizes[key] for key in chr]
-
-        return pos + chr_start
-
-    def get_samples_sparse(self, data):
-        data = data.apply(pd.to_numeric)
-        nrows = max(data['i'].max(), data['j'].max()) + 1
-        data['v'] = data['v'].fillna(0)
-        data['i_binidx'] = self.get_bin_idx(np.full(data.shape[0], self.chr), data['i'])
-        data['j_binidx'] = self.get_bin_idx(np.full(data.shape[0], self.chr), data['j'])
-
-        values = []
-        input_idx = []
-        nvals_list = []
-        for row in range(nrows):
-            # get Hi-C values
-            vals = data[data['i'] == row]['v'].values
-            nvals = vals.shape[0]
-            if nvals == 0:
-                continue
-            else:
-                vals = self.contactProbabilities(vals)
-
-            if (nvals > 10):
-                nvals_list.append(nvals)
-                vals = torch.from_numpy(vals)
-
-                split_vals = vals.split(self.cfg.sequence_length, dim=0)
-                values = values + list(split_vals)
-
-                # get indices
-                j = torch.Tensor(data[data['i'] == row]['j_binidx'].values)
-                i = torch.Tensor(data[data['i'] == row]['i_binidx'].values)
-
-                # concatenate indices
-                ind = torch.cat((i.unsqueeze(-1), j.unsqueeze(-1)), 1)
-                split_ind = torch.split(ind, self.cfg.sequence_length, dim=0)
-                input_idx = input_idx + list(split_ind)
-
-        values = pad_sequence(values, batch_first=True)
-        input_idx = pad_sequence(input_idx, batch_first=True)
-
-        return input_idx, values
-
-    def get_data(self):
-        data = self.load_hic()
-        input_idx, values = self.get_samples_sparse(data)
-
-        # create dataset
-        dataset = torch.utils.data.TensorDataset(input_idx.float(), values.float())
-        return dataset
-
     # form a mini batch from a given list of samples = [(graph, label) pairs]
     def collate(self, samples):
         # The input samples is a list of pairs (graph, label).
@@ -363,3 +364,10 @@ class HiCDataset(torch.utils.data.Dataset):
         self.train.graph_lists = [wl_positional_encoding(g) for g in self.train.graph_lists]
         self.val.graph_lists = [wl_positional_encoding(g) for g in self.val.graph_lists]
         self.test.graph_lists = [wl_positional_encoding(g) for g in self.test.graph_lists]
+
+
+if __name__ == '__main__':
+    cfg = Config()
+
+    chr = 21
+    HiC_data_ob = HiCDatasetDGL(cfg, chr)
